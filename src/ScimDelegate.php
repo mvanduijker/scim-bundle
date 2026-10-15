@@ -26,8 +26,11 @@ final class ScimDelegate
         $this->upsert($user, $user);
     }
 
-    /** Forwards Entra's own operations, so the other app doesn't lose attributes this app doesn't store. */
-    /** @param array<mixed> $operations */
+    /**
+     * Forwards Entra's own operations, so the other app doesn't lose attributes this app doesn't store.
+     *
+     * @param array<mixed> $operations
+     */
     public function patch(ScimUser $before, ScimUser $after, array $operations): void
     {
         $id = $this->remoteId($before);
