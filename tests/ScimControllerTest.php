@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Duijker\ScimBundle\Tests;
 
+use Duijker\ScimBundle\NullUserStore;
 use Duijker\ScimBundle\ScimController;
 use Duijker\ScimBundle\ScimDelegate;
 use Duijker\ScimBundle\ScimUser;
@@ -85,6 +86,17 @@ final class ScimControllerTest extends TestCase
         $this->assertSame(400, $this->call('PATCH', "/Users/$id", ['Operations' => [['op' => 'Replace', 'path' => 'active', 'value' => 'maybe']]], $id)[0]);
         $this->assertSame(204, $this->call('DELETE', "/Users/$id", id: $id)[0]);
         $this->assertSame(404, $this->call('GET', "/Users/$id", id: $id)[0]);
+    }
+
+    public function testUnconfiguredBundleFailsPerRequestNotAtInstall(): void
+    {
+        $this->scim = new ScimController(new NullUserStore(), new StaticTokenProvider(''));
+        $this->assertSame(401, $this->call('GET', '/Users')[0], 'no token = SCIM off');
+
+        $this->scim = new ScimController(new NullUserStore(), new StaticTokenProvider('acme-token'));
+        [$status, $body] = $this->call('GET', '/Users');
+        $this->assertSame(500, $status);
+        $this->assertStringContainsString('ScimUserStore', $body['detail']);
     }
 
     public function testDelegatesEveryChangeToSecondApp(): void

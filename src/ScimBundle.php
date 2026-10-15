@@ -47,10 +47,11 @@ final class ScimBundle extends AbstractBundle
             ->tag('controller.service_arguments')
             ->public();
 
-        if (null !== $config['token']) {
-            $services->set(StaticTokenProvider::class)->args([$config['token']]);
-            $services->alias(ScimTokenProvider::class, StaticTokenProvider::class);
-        }
+        // Defaults so the bundle installs before the app implements anything; the app's own aliases replace them
+        $services->set(NullUserStore::class);
+        $services->alias(ScimUserStore::class, NullUserStore::class);
+        $services->set(StaticTokenProvider::class)->args([$config['token'] ?? '']); // '' never matches: SCIM stays off
+        $services->alias(ScimTokenProvider::class, StaticTokenProvider::class);
 
         if ([] !== $config['delegates']) {
             $services->set(StaticDelegateProvider::class)->args([array_map(

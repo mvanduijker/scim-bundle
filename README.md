@@ -34,9 +34,11 @@ security:
 
 ### Token from somewhere else
 
-Leave out `scim.token` and implement `ScimTokenProvider`, e.g. to let an admin set the token in your app:
+Leave out `scim.token` and implement `ScimTokenProvider`, e.g. to let an admin set the token in your app.
+Without either, the token is empty and every request gets a 401:
 
 ```php
+#[AsAlias(ScimTokenProvider::class)]
 final class DbScimTokenProvider implements ScimTokenProvider
 {
     public function __construct(private SettingsRepository $settings) {}
@@ -64,6 +66,7 @@ scim:
 `ScimDelegateProvider`; return an empty list for customers without app 2:
 
 ```php
+#[AsAlias(ScimDelegateProvider::class)]
 final class DbScimDelegateProvider implements ScimDelegateProvider
 {
     public function __construct(private HttpClientInterface $http, private SettingsRepository $settings) {}
@@ -87,7 +90,8 @@ because that loops.
 
 ## Map it onto your user table
 
-Implement `ScimUserStore`. If it's the only implementation in `src/`, autowiring picks it up. Example for a
+Implement `ScimUserStore` and mark it with `#[AsAlias]` (the bundle ships a `NullUserStore` that answers every request
+with a 500 until you do; Symfony doesn't auto-alias interfaces from `vendor/`). Example for a
 Doctrine `User` entity (rename the fields to match yours):
 
 ```php
@@ -96,7 +100,9 @@ namespace App\Scim;
 use App\Entity\User;
 use Duijker\ScimBundle\{ScimUser, ScimUserStore};
 use Doctrine\ORM\EntityManagerInterface;
+use Symfony\Component\DependencyInjection\Attribute\AsAlias;
 
+#[AsAlias(ScimUserStore::class)]
 final class UserScimStore implements ScimUserStore
 {
     // Entra app role value => app role. Customers choose the role values in their own tenant,
