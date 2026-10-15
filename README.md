@@ -185,18 +185,44 @@ Users with `active = false` must not be able to log in. Check that in your Entra
 
 ## Customer setup in Entra
 
-1. Enterprise applications → *New application* → *Create your own* → "Integrate any other application (non-gallery)".
-2. Provisioning → Mode **Automatic**
-   - Tenant URL: `https://<your-host>/scim/v2?aadOptscim062020` (the flag turns on RFC-compliant PATCH)
-   - Secret token: that deployment's `SCIM_TOKEN`
+Needs Entra ID P1 or P2 and an Application Administrator (or higher) role.
+
+1. Enterprise applications → *New application* → *Create your own application* → "Integrate any other application you
+   don't find in the gallery (Non-gallery)". Use a **separate app** for provisioning: an enterprise app created from your
+   OIDC login's app registration usually has *Get started* greyed out on the Provisioning page.
+2. Provisioning → Mode **Automatic**, under *Admin Credentials*:
+   - Tenant URL: `https://<your-host>/scim/v2?aadOptscim062020` (the flag turns on RFC-compliant PATCH; it's not a secret)
+   - Secret Token: that deployment's `SCIM_TOKEN`
    - *Test connection*
 3. Mappings: **disable "Provision Microsoft Entra ID Groups"**, because this bundle only does users.
-4. User mappings: map `objectId` → `externalId` and give it matching precedence 1. Entra then matches on the
-   Entra object ID (the `oid` claim) that an Entra login or Graph-based sync would store, so existing users are linked, not duplicated.
-5. Roles: in the app registration (App roles), create roles whose *Value* matches the keys of your role map (`Admin`, `User`).
-   In the user mappings, *Add new mapping* → Expression `AssertiveAppRoleAssignmentsComplex([appRoleAssignments])` → target `roles`.
-   Assign users to the app with the right role. (Use the *Assertive* variant: the plain one never sends role removals.)
-6. Scope: "Sync only assigned users and groups", then assign users and start provisioning.
+4. "Provision Microsoft Entra ID Users": Entra doesn't send `externalId` unless you map it. Edit the `externalId` row
+   (or *Add New Mapping*): Direct, source `objectId`, target `externalId`, *Match objects using this attribute* Yes,
+   matching precedence **1**, apply Always. Set `userPrincipalName → userName` to precedence 2. Entra then matches on the
+   object ID (the `oid` claim) an Entra login stores, so existing users are linked, not duplicated.
+5. Roles:
+   - In the **provisioning app's** registration (App registrations → All applications), create app roles whose *Value*
+     exactly matches a key of your role map (`Admin`, `User`). Values not in the map are dropped.
+   - Tick *Show advanced options* → *Edit attribute list for customappsso* and make sure there's a `roles` attribute,
+     type String, **Multi-Value** ticked.
+   - *Add New Mapping* → Expression `AssertiveAppRoleAssignmentsComplex([appRoleAssignments])` → target `roles`, apply
+     Always. Use the *Assertive* variant: the plain one never sends role removals.
+   - Assign users or groups to the app with one of your roles. The built-in "User" role has no Value, so Entra sends its
+     id (`18d14569-c3bd-439b-9a66-3a2aee01d14f`); your role map drops it.
+6. Settings → Scope: "Sync only assigned users and groups".
+7. Test one user with **Provision on demand**: it shows the request Entra sends and your app's response. Then turn
+   provisioning **On**; after the first cycle Entra syncs changes about every 40 minutes.
+
+### Testing locally
+
+Entra needs a public HTTPS URL; a Cloudflare quick tunnel works without an account:
+
+```bash
+cloudflared tunnel --url https://127.0.0.1:8000 --no-tls-verify
+# behind nginx-proxy (503 otherwise): also pass --http-host-header <your VIRTUAL_HOST>
+```
+
+Use the printed `https://….trycloudflare.com/scim/v2?aadOptscim062020` as Tenant URL. It changes on every start, and
+the tunnel exposes your whole dev app (including `/_profiler`), so only run it while testing.
 
 ## Not supported
 
